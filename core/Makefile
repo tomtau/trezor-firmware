@@ -117,6 +117,9 @@ build_unix: res ## build unix port
 build_unix_frozen: res build_cross ## build unix port with frozen modules
 	$(SCONS) CFLAGS="$(CFLAGS)" $(UNIX_BUILD_DIR)/micropython $(UNIX_PORT_OPTS) PYOPT="$(PYOPT)" BITCOIN_ONLY="$(BITCOIN_ONLY)" TREZOR_EMULATOR_FROZEN=1
 
+build_unix_debug: res ## build unix port
+	$(SCONS) --max-drift=1 CFLAGS="$(CFLAGS)" $(UNIX_BUILD_DIR)/micropython $(UNIX_PORT_OPTS) TREZOR_EMULATOR_ASAN=1 TREZOR_EMULATOR_DEBUGGABLE=1
+
 build_cross: ## build mpy-cross port
 	$(MAKE) -C vendor/micropython/mpy-cross $(CROSS_PORT_OPTS)
 
@@ -224,3 +227,12 @@ upload: ## upload firmware using trezorctl
 
 upload_prodtest: ## upload prodtest using trezorctl
 	trezorctl firmware_update -f $(PRODTEST_BUILD_DIR)/prodtest.bin
+
+coverage:
+	@TREZOR_PROFILE="" PROFILING=1 make test_emu test_emu_monero && \
+	sync && \
+	cp ./src/.coverage .coverage.exec && \
+	coverage run --source=./src /dev/null 2>/dev/null && \
+	mv .coverage .coverage.empty && \
+	coverage combine .coverage.empty .coverage.exec && \
+	coverage html
