@@ -455,7 +455,7 @@ MP_NOINLINE int main_(int argc, char **argv) {
   signal(SIGPIPE, SIG_IGN);
 #endif
 
-  mp_stack_set_limit(60000 * (BYTES_PER_WORD / 4));
+  mp_stack_set_limit(600000 * (BYTES_PER_WORD / 4));
 
   pre_process_options(argc, argv);
 
@@ -651,6 +651,14 @@ MP_NOINLINE int main_(int argc, char **argv) {
       ret = execute_from_lexer(LEX_SRC_STDIN, NULL, MP_PARSE_FILE_INPUT, false);
     }
   }
+
+#if MICROPY_PY_SYS_UATEXIT
+  if (mp_obj_is_callable(MP_STATE_VM(exitfunc))) {
+    mp_obj_t exitfunc = MP_STATE_VM(exitfunc);
+    MP_STATE_VM(exitfunc) = mp_const_none;
+    mp_call_function_0(exitfunc);
+  }
+#endif
 
 #if MICROPY_PY_MICROPYTHON_MEM_INFO
   if (mp_verbose_flag) {
