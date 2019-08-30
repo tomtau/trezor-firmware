@@ -43,9 +43,19 @@ core unix device test:
   <<: *only_changes_core
   dependencies:
     - core unix frozen regular build
+  variables:
+    TREZOR_PROFILING: 1
   script:
     - cd core
     - pipenv run make test_emu
+    - sync
+    - sleep 1
+    - mv ./src/.coverage .coverage.test_emu
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+    - core/.coverage.*
+    expire_in: 1 day
 
 core unix btconly device test:
   stage: test
@@ -64,19 +74,39 @@ core unix monero test:
   <<: *only_changes_core
   dependencies:
     - core unix frozen regular build
+  variables:
+    TREZOR_PROFILING: 1
   script:
     - cd core
     - pipenv run make test_emu_monero
+    - sync
+    - sleep 1
+    - mv ./src/.coverage .coverage.test_emu_monero
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+    - core/.coverage.*
+    expire_in: 1 day
 
 core unix u2f test:
   stage: test
   <<: *only_changes_core
   dependencies:
     - core unix frozen regular build
+  variables:
+    TREZOR_PROFILING: 1
   script:
     - make -C tests/fido_tests/u2f-tests-hid
     - cd core
     - pipenv run make test_emu_u2f
+    - sync
+    - sleep 1
+    - mv ./src/.coverage .coverage.test_emu_u2f
+  artifacts:
+    name: "$CI_JOB_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+    - core/.coverage.*
+    expire_in: 1 day
 
 core unix upgrade test:
   stage: test
