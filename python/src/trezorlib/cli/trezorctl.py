@@ -31,7 +31,6 @@ import click
 import requests
 
 from trezorlib import (
-    binance,
     btc,
     cardano,
     coins,
@@ -49,14 +48,14 @@ from trezorlib import (
     monero,
     nem,
     protobuf,
-    ripple,
     stellar,
-    tezos,
     tools,
     ui,
 )
 from trezorlib.client import TrezorClient
 from trezorlib.transport import enumerate_devices, get_transport
+
+from . import binance, ripple, tezos
 
 try:
     import rlp
@@ -123,18 +122,35 @@ CHOICE_RESET_DEVICE_TYPE = ChoiceType(
 )
 
 
-class UnderscoreAgnosticGroup(click.Group):
-    """Command group that normalizes dashes and underscores.
+class TrezorctlGroup(click.Group):
+    """Command group that handles compatibility for trezorctl.
+
+    The purpose is twofold: convert underscores to dashes, and ensure old-style commands
+    still work with new-style groups.
 
     Click 7.0 silently switched all underscore_commands to dash-commands.
     This implementation of `click.Group` responds to underscore_commands by invoking
     the respective dash-command.
+
+    With trezorctl 0.11.5, we started to convert old-style long commands
+    (such as "binance-sign-tx") to command groups ("binance") with subcommands
+    ("sign-tx"). The `TrezorctlGroup` can perform subcommand lookup: if a command
+    "binance-sign-tx" does not exist in the default group, it tries to find "sign-tx"
+    subcommand of "binance" group.
     """
 
     def get_command(self, ctx, cmd_name):
+        dashed_name = cmd_name.replace("_", "-")
         cmd = super().get_command(ctx, cmd_name)
         if cmd is None:
-            cmd = super().get_command(ctx, cmd_name.replace("_", "-"))
+            # Old-style top-level commands looked like this: binance-sign-tx.
+            # We are moving to 'binance' command with 'sign-tx' subcommand.
+            try:
+                command, subcommand = cmd_name.split("-", maxsplit=1)
+                cmd = super().get_command(ctx, command)
+                return cmd.get_command(ctx, subcommand)
+            except Exception:
+                return None
         return cmd
 
 
@@ -143,7 +159,7 @@ def enable_logging():
     log.OMITTED_MESSAGES.add(proto.Features)
 
 
-@click.command(cls=UnderscoreAgnosticGroup, context_settings={"max_content_width": 400})
+@click.command(cls=TrezorctlGroup, context_settings={"max_content_width": 400})
 @click.option(
     "-p",
     "--path",
@@ -1803,130 +1819,9 @@ def stellar_sign_transaction(connect, b64envelope, address, network_passphrase):
     return base64.b64encode(resp.signature)
 
 
-#
-# Ripple functions
-#
-@cli.command(help="Get Ripple address")
-@click.option(
-    "-n", "--address", required=True, help="BIP-32 path to key, e.g. m/44'/144'/0'/0/0"
-)
-@click.option("-d", "--show-display", is_flag=True)
-@click.pass_obj
-def ripple_get_address(connect, address, show_display):
-    client = connect()
-    address_n = tools.parse_path(address)
-    return ripple.get_address(client, address_n, show_display)
-
-
-@cli.command(help="Sign Ripple transaction")
-@click.option(
-    "-n", "--address", required=True, help="BIP-32 path to key, e.g. m/44'/144'/0'/0/0"
-)
-@click.option(
-    "-f", "--file", type=click.File("r"), default="-", help="Transaction in JSON format"
-)
-@click.pass_obj
-def ripple_sign_tx(connect, address, file):
-    client = connect()
-    address_n = tools.parse_path(address)
-    msg = ripple.create_sign_tx_msg(json.load(file))
-
-    result = ripple.sign_tx(client, address_n, msg)
-    click.echo("Signature:")
-    click.echo(result.signature.hex())
-    click.echo()
-    click.echo("Serialized tx including the signature:")
-    click.echo(result.serialized_tx.hex())
-
-
-#
-# Tezos functions
-#
-@cli.command(help="Get Tezos address for specified path.")
-@click.option("-n", "--address", required=True, help="BIP-32 path, e.g. m/44'/1729'/0'")
-@click.option("-d", "--show-display", is_flag=True)
-@click.pass_obj
-def tezos_get_address(connect, address, show_display):
-    client = connect()
-    address_n = tools.parse_path(address)
-    return tezos.get_address(client, address_n, show_display)
-
-
-@cli.command(help="Get Tezos public key.")
-@click.option("-n", "--address", required=True, help="BIP-32 path, e.g. m/44'/1729'/0'")
-@click.option("-d", "--show-display", is_flag=True)
-@click.pass_obj
-def tezos_get_public_key(connect, address, show_display):
-    client = connect()
-    address_n = tools.parse_path(address)
-    return tezos.get_public_key(client, address_n, show_display)
-
-
-@cli.command(help="Sign Tezos transaction.")
-@click.option("-n", "--address", required=True, help="BIP-32 path, e.g. m/44'/1729'/0'")
-@click.option(
-    "-f",
-    "--file",
-    type=click.File("r"),
-    default="-",
-    help="Transaction in JSON format (byte fields should be hexlified)",
-)
-@click.pass_obj
-def tezos_sign_tx(connect, address, file):
-    client = connect()
-    address_n = tools.parse_path(address)
-    msg = protobuf.dict_to_proto(proto.TezosSignTx, json.load(file))
-    return tezos.sign_tx(client, address_n, msg)
-
-
-#
-# Binance functions
-#
-
-
-@cli.command(help="Get Binance address for specified path.")
-@click.option(
-    "-n", "--address", required=True, help="BIP-32 path to key, e.g. m/44'/714'/0'/0/0"
-)
-@click.option("-d", "--show-display", is_flag=True)
-@click.pass_obj
-def binance_get_address(connect, address, show_display):
-    client = connect()
-    address_n = tools.parse_path(address)
-
-    return binance.get_address(client, address_n, show_display)
-
-
-@cli.command(help="Get Binance public key.")
-@click.option(
-    "-n", "--address", required=True, help="BIP-32 path to key, e.g. m/44'/714'/0'/0/0"
-)
-@click.option("-d", "--show-display", is_flag=True)
-@click.pass_obj
-def binance_get_public_key(connect, address, show_display):
-    client = connect()
-    address_n = tools.parse_path(address)
-
-    return binance.get_public_key(client, address_n, show_display).hex()
-
-
-@cli.command(help="Sign Binance transaction")
-@click.option(
-    "-n", "--address", required=True, help="BIP-32 path to key, e.g. m/44'/714'/0'/0/0"
-)
-@click.option(
-    "-f",
-    "--file",
-    type=click.File("r"),
-    required=True,
-    help="Transaction in JSON format",
-)
-@click.pass_obj
-def binance_sign_tx(connect, address, file):
-    client = connect()
-    address_n = tools.parse_path(address)
-
-    return binance.sign_tx(client, address_n, json.load(file))
+cli.add_command(binance.cli)
+cli.add_command(ripple.cli)
+cli.add_command(tezos.cli)
 
 
 #
