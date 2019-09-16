@@ -25,12 +25,10 @@ def list_credentials(client):
 
 
 @expect(proto.Success, field="message")
-def add_credential(client, hex_credential_id):
-    return client.call(
-        proto.WebAuthnAddResidentCredential(bytes.fromhex(hex_credential_id))
-    )
+def add_credential(client, credential_id):
+    return client.call(proto.WebAuthnAddResidentCredential(credential_id))
 
 
 @expect(proto.Success, field="message")
 def remove_credential(client, index):
-    return client.call(proto.WebAuthnRemoveResidentCredential(int(index)))
+    return client.call(proto.WebAuthnRemoveResidentCredential(index))

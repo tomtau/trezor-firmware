@@ -1966,7 +1966,7 @@ def webauthn_add_credential(connect, hex_credential_id):
 
     HEX_CREDENTIAL_ID is the credential ID as a hexadecimal string.
     """
-    return webauthn.add_credential(connect(), hex_credential_id)
+    return webauthn.add_credential(connect(), bytes.fromhex(hex_credential_id))
 
 
 @cli.command(help="Remove the resident credential at the given index.")
