@@ -16,7 +16,7 @@
 
 import pytest
 
-from trezorlib import messages as proto
+from trezorlib import webauthn
 from trezorlib.exceptions import Cancelled, TrezorFailure
 
 from ..common import MNEMONIC12
@@ -107,28 +107,23 @@ CREDS = [
 ]
 
 
+@pytest.mark.skip_t1
+@pytest.mark.altcoin
 class TestMsgWebAuthn:
-    @staticmethod
-    def list_resident_credentials(client):
-        ret = client.call(proto.WebAuthnListResidentCredentials())
-        assert isinstance(ret, proto.WebAuthnCredentials)
-        return ret.credentials
-
     @pytest.mark.setup_client(mnemonic=MNEMONIC12)
     def test_add_remove(self, client):
         # Remove index 0 should fail.
         with pytest.raises(TrezorFailure):
-            client.call(proto.WebAuthnRemoveResidentCredential(0))
+            webauthn.remove_credential(client, 0)
 
         # List should be empty.
-        assert self.list_resident_credentials(client) == []
+        assert webauthn.list_credentials(client) == []
 
         # Add valid credential #1.
-        ret = client.call(proto.WebAuthnAddResidentCredential(CRED1))
-        assert isinstance(ret, proto.Success)
+        webauthn.add_credential(client, CRED1)
 
         # Check that the credential was added and parameters are correct.
-        creds = self.list_resident_credentials(client)
+        creds = webauthn.list_credentials(client)
         assert len(creds) == 1
         assert creds[0].rp_id == "example.com"
         assert creds[0].rp_name == "Example"
@@ -141,11 +136,10 @@ class TestMsgWebAuthn:
         assert creds[0].hmac_secret is True
 
         # Add valid credential #2, which has same rpId and userId as credential #1.
-        ret = client.call(proto.WebAuthnAddResidentCredential(CRED2))
-        assert isinstance(ret, proto.Success)
+        webauthn.add_credential(client, CRED2)
 
         # Check that the credential #2 replaced credential #1 and parameters are correct.
-        creds = self.list_resident_credentials(client)
+        creds = webauthn.list_credentials(client)
         assert len(creds) == 1
         assert creds[0].rp_id == "example.com"
         assert creds[0].rp_name is None
@@ -159,45 +153,41 @@ class TestMsgWebAuthn:
 
         # Adding an invalid credential should appear as if user cancelled.
         with pytest.raises(Cancelled):
-            client.call(proto.WebAuthnAddResidentCredential(CRED1[:-2]))
+            webauthn.add_credential(client, CRED1[:-2])
 
         # Check that the credential was not added.
-        creds = self.list_resident_credentials(client)
+        creds = webauthn.list_credentials(client)
         assert len(creds) == 1
 
         # Add valid credential, which has same userId as #2, but different rpId.
-        ret = client.call(proto.WebAuthnAddResidentCredential(CRED3))
-        assert isinstance(ret, proto.Success)
+        webauthn.add_credential(client, CRED3)
 
         # Check that the credential was added.
-        creds = self.list_resident_credentials(client)
+        creds = webauthn.list_credentials(client)
         assert len(creds) == 2
 
         # Fill up with 14 more valid credentials.
         for cred in CREDS[:14]:
-            ret = client.call(proto.WebAuthnAddResidentCredential(cred))
-            assert isinstance(ret, proto.Success)
+            webauthn.add_credential(client, cred)
 
         # Adding one more valid credential to full storage should fail.
         with pytest.raises(TrezorFailure):
-            client.call(proto.WebAuthnAddResidentCredential(CREDS[14]))
+            webauthn.add_credential(client, CREDS[14])
 
         # Remove index 16 should fail.
         with pytest.raises(TrezorFailure):
-            client.call(proto.WebAuthnRemoveResidentCredential(16))
+            webauthn.remove_credential(client, 16)
 
         # Remove index 2.
-        ret = client.call(proto.WebAuthnRemoveResidentCredential(2))
-        assert isinstance(ret, proto.Success)
+        webauthn.remove_credential(client, 2)
 
         # Check that the credential was removed.
-        creds = self.list_resident_credentials(client)
+        creds = webauthn.list_credentials(client)
         assert len(creds) == 15
 
         # Adding another valid credential should succeed now.
-        ret = client.call(proto.WebAuthnAddResidentCredential(CREDS[14]))
-        assert isinstance(ret, proto.Success)
+        webauthn.add_credential(client, CREDS[14])
 
         # Check that the credential was added.
-        creds = self.list_resident_credentials(client)
+        creds = webauthn.list_credentials(client)
         assert len(creds) == 16
