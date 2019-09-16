@@ -122,11 +122,11 @@ CHOICE_RESET_DEVICE_TYPE = ChoiceType(
     }
 )
 
-CHOICE_SD_SALT_OPERATION_TYPE = ChoiceType(
+CHOICE_SD_PROTECT_OPERATION_TYPE = ChoiceType(
     {
-        "enable": proto.SdSaltOperationType.ENABLE,
-        "disable": proto.SdSaltOperationType.DISABLE,
-        "regenerate": proto.SdSaltOperationType.REGENERATE,
+        "enable": proto.SdProtectOperationType.ENABLE,
+        "disable": proto.SdProtectOperationType.DISABLE,
+        "refresh": proto.SdProtectOperationType.REFRESH,
     }
 )
 
@@ -276,19 +276,19 @@ def change_pin(connect, remove):
 
 
 @cli.command()
-@click.argument("operation", type=CHOICE_SD_SALT_OPERATION_TYPE)
+@click.argument("operation", type=CHOICE_SD_PROTECT_OPERATION_TYPE)
 @click.pass_obj
-def sd_salt(connect, operation):
-    """Configure SD card salt protection.
+def sd_protect(connect, operation):
+    """Secure the device with SD card protection.
 
-    Enable, disable or regenerate SD card salt. The options are:
+    Enable, disable or refresh SD card protection. The options are:
 
     \b
-    enable - Generate SD card salt and use it to encrypt the storage.
+    enable - Generate SD card salt and use it to protect the PIN and storage.
     disable - Remove SD card salt protection.
-    regenerate - Replace the current SD card salt and with a new one.
+    refresh - Replace the current SD card salt with a new one.
     """
-    return device.sd_salt(connect(), operation)
+    return device.sd_protect(connect(), operation)
 
 
 @cli.command(help="Enable passphrase.")
