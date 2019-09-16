@@ -1938,7 +1938,8 @@ def binance_sign_tx(connect, address, file):
 @cli.command(help="List all resident credentials on the device.")
 @click.pass_obj
 def webauthn_list_credentials(connect):
-    for cred in webauthn.list_credentials(connect()):
+    creds = webauthn.list_credentials(connect())
+    for cred in creds:
         click.echo("")
         click.echo("WebAuthn credential at index {}:".format(cred.index))
         if cred.rp_id is not None:
@@ -1956,6 +1957,9 @@ def webauthn_list_credentials(connect):
         if cred.hmac_secret is not None:
             click.echo("  hmac-secret enabled:  {}".format(cred.hmac_secret))
         click.echo("  Credential ID:        {}".format(cred.id.hex()))
+
+    if not creds:
+        click.echo("There are no resident credentials stored on the device.")
 
 
 @cli.command()
